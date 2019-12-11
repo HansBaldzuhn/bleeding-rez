@@ -21,19 +21,53 @@ def commands():
 
 
 def hello_world_source():
-    import sys
-    from optparse import OptionParser
+    if os.name == "nt":
+        return \
+        """
+        @echo off
 
-    p = OptionParser()
-    p.add_option("-q", dest="quiet", action="store_true",
-        help="quiet mode")
-    p.add_option("-r", dest="retcode", type="int", default=0,
-        help="exit with a non-zero return code")
-    opts,args = p.parse_args()
+        set quiet=0
+        set retcode=0
+        
+        :loop
+        IF NOT "%1"=="" (
+            IF "%1"=="-q" (
+                set quiet=1
+                SHIFT
+            )
+            IF "%1"=="-r" (
+                set retcode=%2
+                SHIFT
+                SHIFT
+            )
+            GOTO :loop
+        )
+        
+        echo return code: %retcode%
+        
+        IF %quiet%==0 (
+            echo "Hello Rez World!"
+        )
+        exit %retcode%
+        """
 
-    if not opts.quiet:
-        print("Hello Rez World!")
-    sys.exit(opts.retcode)
+    else:
+        return \
+        """
+        import sys
+        from optparse import OptionParser
+    
+        p = OptionParser()
+        p.add_option("-q", dest="quiet", action="store_true",
+            help="quiet mode")
+        p.add_option("-r", dest="retcode", type="int", default=0,
+            help="exit with a non-zero return code")
+        opts,args = p.parse_args()
+    
+        if not opts.quiet:
+            print("Hello Rez World!")
+        sys.exit(opts.retcode)
+        """
 
 
 def bind(path, version_range=None, opts=None, parser=None):
@@ -43,12 +77,15 @@ def bind(path, version_range=None, opts=None, parser=None):
     def make_root(variant, root):
         binpath = make_dirs(root, "bin")
         filepath = os.path.join(binpath, "hello_world")
-        create_executable_script(filepath, hello_world_source)
-
+        if os.name == "nt":
+            filepath += ".bat"
+        create_executable_script(filepath, hello_world_source())
+        
     with make_package("hello_world", path, make_root=make_root) as pkg:
         pkg.version = version
         pkg.tools = ["hello_world"]
         pkg.commands = commands
+        pkg.variant = [["platform-linux"],["platform-windows"]]
 
     return pkg.installed_variants
 

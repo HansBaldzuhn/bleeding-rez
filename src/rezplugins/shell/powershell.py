@@ -50,7 +50,7 @@ class PowerShell(CMD):
         files = []
         do_rcfile = False
         
-        if rcfile:
+        if rcfile and (command is None):
             do_rcfile = True
             if rcfile and os.path.exists(os.path.expanduser(rcfile)):
                 files.append(rcfile)

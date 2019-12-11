@@ -36,10 +36,8 @@ class PowerShell(CMD):
     @classmethod
     def startup_capabilities(cls, rcfile=False, norc=False, stdin=False,
                              command=False):
-        cls._unsupported_option('rcfile', rcfile)
         cls._unsupported_option('norc', norc)
         cls._unsupported_option('stdin', stdin)
-        rcfile = False
         norc = False
         stdin = False
         return (rcfile, norc, stdin, command)
@@ -48,13 +46,21 @@ class PowerShell(CMD):
     def get_startup_sequence(cls, rcfile, norc, stdin, command):
         rcfile, norc, stdin, command = \
             cls.startup_capabilities(rcfile, norc, stdin, command)
+            
+        files = []
+        do_rcfile = False
+        
+        if rcfile:
+            do_rcfile = True
+            if rcfile and os.path.exists(os.path.expanduser(rcfile)):
+                files.append(rcfile)
 
         return dict(
             stdin=stdin,
             command=command,
-            do_rcfile=False,
+            do_rcfile=do_rcfile,
             envvar=None,
-            files=[],
+            files=files,
             bind_files=[],
             source_bind_files=(not norc)
         )
@@ -76,6 +82,9 @@ class PowerShell(CMD):
                 ex.unsetenv(startup_sequence["envvar"])
             if bind_rez:
                 ex.interpreter._bind_interactive_rez()
+            if startup_sequence["do_rcfile"]:
+                for f in startup_sequence["files"]:
+                    ex.source(f)                
             if print_msg and not quiet:
                 ex.info('You are now in a rez-configured environment.')
 

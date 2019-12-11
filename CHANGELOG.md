@@ -1,5 +1,13 @@
 # Change Log
 
+## 2.40.4 (2019-12-11)
+
+**Notes**
+
+Enable supporting the --rcfile argument for powershell.
+The file specified after this flag is injected right before the info You are now in a rez-configured environment.' in the target_file
+
+
 ## 2.40.3 (2019-08-15)
 [Source](https://github.com/nerdvegas/rez/tree/2.40.3) | [Diff](https://github.com/nerdvegas/rez/compare/2.40.2...2.40.3)
 

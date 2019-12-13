@@ -18,6 +18,7 @@ except NameError:
 class PowerShell(CMD):
     syspaths = None
     _executable = None
+    stdin_arg_name = "in_stdin"
 
     @property
     def executable(cls):
@@ -37,9 +38,17 @@ class PowerShell(CMD):
     def startup_capabilities(cls, rcfile=False, norc=False, stdin=False,
                              command=False):
         cls._unsupported_option('norc', norc)
-        cls._unsupported_option('stdin', stdin)
         norc = False
-        stdin = False
+        
+        if command not in (None, False):
+            cls._overruled_option('stdin', 'command', stdin)
+            cls._overruled_option('rcfile', 'command', rcfile)
+            stdin = False
+            rcfile = False
+        if stdin:
+            cls._overruled_option('rcfile', 'stdin', rcfile)
+            rcfile = False
+        
         return (rcfile, norc, stdin, command)
 
     @classmethod
@@ -50,9 +59,9 @@ class PowerShell(CMD):
         files = []
         do_rcfile = False
         
-        if rcfile and (command is None):
+        if rcfile:
             do_rcfile = True
-            if rcfile and os.path.exists(os.path.expanduser(rcfile)):
+            if rcfile and os.path.exists(os.path.expanduser(rcfile)) and rcfile.endswith(".ps1"):
                 files.append(rcfile)
 
         return dict(
@@ -64,6 +73,28 @@ class PowerShell(CMD):
             bind_files=[],
             source_bind_files=(not norc)
         )
+    
+    def add_argument_parser(self, arg_dict={}):
+        """
+        dict is of form:
+        arg_dict= { argument1: {"type": type,
+                                "default_value": default_value
+                                },
+                    argument2: {"type": type,
+                                "default_value": default_value
+                                }
+                    }
+        """
+        self._addline('param (')
+        for arg in arg_dict:
+            self._addline('\t[{}]${}={}'.format( arg_dict[arg]["type"],
+                                                 arg,
+                                                 arg_dict[arg]["default_value"])
+            )
+        self._addline(')')
+        
+    def invoke(self, expr):
+        self._addline('Invoke-Expression {}'.format(expr))
 
     def _bind_interactive_rez(self):
         if config.set_prompt and self.settings.prompt:
@@ -77,14 +108,18 @@ class PowerShell(CMD):
         shell_command = None
 
         def _record_shell(ex, files, bind_rez=True, print_msg=False):
+            if startup_sequence["stdin"]:
+                # prepare the script for $input argument
+                arg_data = {self.stdin_arg_name:{"type":"string", "default_value":'""'}}
+                ex.interpreter.add_argument_parser(arg_data)
             ex.source(context_file)
             if startup_sequence["envvar"]:
                 ex.unsetenv(startup_sequence["envvar"])
             if bind_rez:
                 ex.interpreter._bind_interactive_rez()
-            if startup_sequence["do_rcfile"]:
-                for f in startup_sequence["files"]:
-                    ex.source(f)                
+            # The "files" item can only be fed by the rcfile argument, it should contain only one element
+            for f in startup_sequence["files"]:
+                ex.source(f)
             if print_msg and not quiet:
                 ex.info('You are now in a rez-configured environment.')
 
@@ -93,6 +128,9 @@ class PowerShell(CMD):
                 # available, in which case the command will succeed
                 # but output to stderr, muted with 2>$null
                 ex.command("Try { rez context 2>$null } Catch { }")
+            if startup_sequence["stdin"]:
+                # Invoke what was passed to stdin
+                ex.interpreter.invoke("${}".format(self.stdin_arg_name))
 
         executor = RexExecutor(interpreter=self.new_shell(),
                                parent_environ={},
@@ -101,6 +139,9 @@ class PowerShell(CMD):
         if startup_sequence["command"] is not None:
             _record_shell(executor, files=startup_sequence["files"])
             shell_command = startup_sequence["command"]
+        elif startup_sequence["stdin"]:
+            _record_shell(executor,
+                          files=startup_sequence["files"])
         else:
             _record_shell(executor,
                           files=startup_sequence["files"],
@@ -126,6 +167,17 @@ class PowerShell(CMD):
 
             if not isinstance(cmd, (tuple, list)):
                 cmd = pre_command.rstrip().split()
+                
+                
+        target_file_execute_string = '. "{}"'.format(target_file)        
+        if startup_sequence["stdin"]:
+            target_file_execute_string += " -in_stdin $input"
+        if shell_command or startup_sequence["stdin"]:
+            # We force powershell to return the exit code of the target file
+            # Without this, the return code is the one from powershell.exe
+            # For "stdin" if we don't force to quit, the shell will never end.
+            # That also means that stdin will work only once
+            target_file_execute_string += ";exit $LASTEXITCODE"
 
         cmd += [
             self.executable,
@@ -140,11 +192,14 @@ class PowerShell(CMD):
             "-ExecutionPolicy", "Unrestricted",
 
             # Start from this script
-            '. "{}"'.format(target_file)
+            target_file_execute_string
         ]
 
-        if shell_command is None:
+        if shell_command is None or startup_sequence["stdin"] is None:
             cmd.insert(1, "-NoExit")
+            
+        if startup_sequence["stdin"] and stdin and (stdin is not True):
+            Popen_args["stdin"] = stdin
 
         # No environment was explicity passed
         if not env and not config.inherit_parent_environment:

@@ -133,7 +133,8 @@ class TestShells(TestBase, TempdirMixin):
         rcfile, _, _, command = sh.startup_capabilities(rcfile=True, command=True)
 
         if rcfile and command:
-            f, path = tempfile.mkstemp()
+            # Force extension (mainly needed for windows)
+            f, path = tempfile.mkstemp(prefix="rcfile_", suffix=".{}".format(sh.file_extension()))
             os.write(f, "hello_world\n")
             os.close(f)
 

@@ -12,7 +12,10 @@ from rez.vendor.version.version import Version
 from rez.utils.lint_helper import env
 from rez.util import create_executable_script
 from rez.bind._utils import make_dirs, check_version
+from rez.system import system
+import os
 import os.path
+import inspect
 
 
 def commands():
@@ -22,7 +25,7 @@ def commands():
 
 def hello_world_source():
     if os.name == "nt":
-        return \
+        code = \
         """
         @echo off
 
@@ -43,31 +46,37 @@ def hello_world_source():
             GOTO :loop
         )
         
-        echo return code: %retcode%
-        
         IF %quiet%==0 (
-            echo "Hello Rez World!"
+            echo Hello Rez World!
         )
         exit %retcode%
         """
+        return inspect.cleandoc(code)
 
     else:
-        return \
+        code =  \
         """
-        import sys
-        from optparse import OptionParser
-    
-        p = OptionParser()
-        p.add_option("-q", dest="quiet", action="store_true",
-            help="quiet mode")
-        p.add_option("-r", dest="retcode", type="int", default=0,
-            help="exit with a non-zero return code")
-        opts,args = p.parse_args()
-    
-        if not opts.quiet:
-            print("Hello Rez World!")
-        sys.exit(opts.retcode)
+        set -e
+        
+        retcode=0
+        
+        while [ "$1" != "" ]; do
+            case $1 in
+                -q | --quiet )       quiet=1
+                                     ;;
+                -r | --retcode )     retcode="$2"
+                                     shift
+                                     ;;
+            esac
+            shift
+        done
+        
+        if [ -z $quiet ]; then
+            echo Hello Rez World!
+        fi
+        exit $retcode
         """
+        return inspect.cleandoc(code)
 
 
 def bind(path, version_range=None, opts=None, parser=None):
@@ -77,15 +86,15 @@ def bind(path, version_range=None, opts=None, parser=None):
     def make_root(variant, root):
         binpath = make_dirs(root, "bin")
         filepath = os.path.join(binpath, "hello_world")
+        program = "bash"
         if os.name == "nt":
-            filepath += ".bat"
-        create_executable_script(filepath, hello_world_source())
+            program = "cmd"
+        create_executable_script(filepath, hello_world_source(), program=program)
         
     with make_package("hello_world", path, make_root=make_root) as pkg:
         pkg.version = version
         pkg.tools = ["hello_world"]
         pkg.commands = commands
-        pkg.variant = [["platform-linux"],["platform-windows"]]
 
     return pkg.installed_variants
 

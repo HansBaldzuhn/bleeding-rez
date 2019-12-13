@@ -189,7 +189,8 @@ def shell_dependent(exclude=None):
 
             for shell in shells:
                 if exclude and shell in exclude:
-                    self.skipTest("This test does not run on %s shell." % shell)
+                    print("This test does not run on %s shell." % shell)
+                    continue
                 print("\ntesting in shell: %s..." % shell)
                 config.override("default_shell", shell)
                 func(self, *args, **kwargs)

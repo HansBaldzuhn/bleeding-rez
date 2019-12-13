@@ -45,10 +45,16 @@ def create_executable_script(filepath, body, program=None):
 
     if not body.endswith('\n'):
         body += '\n'
+    
+    if os.name == "nt":
+        if program == "cmd" and not filepath.endswith(".bat"):
+            filepath += ".bat"
+        if program == "powershell" and not filepath.endswith(".ps1"):
+            filepath += ".ps1"
 
     with open(filepath, 'w') as f:
-        # TODO: make cross platform
-        f.write("#!/usr/bin/env %s\n" % program)
+        if os.name == "posix":
+            f.write("#!/usr/bin/env %s\n" % program)
         f.write(body)
 
     # TODO: Although Windows supports os.chmod you can only set the readonly

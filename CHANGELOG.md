@@ -4,9 +4,19 @@
 
 **Notes**
 
-Enable supporting the --rcfile argument for powershell.
-The file specified after this flag is injected right before the info You are now in a rez-configured environment.' in the target_file
+- Enable support for the --rcfile argument for powershell.
+	The file specified after this flag is injected right before the info "You are now in a rez-configured environment." in the target_file
+- Enable support for the --stdin argument for powershell.
 
+Testing this new feature has been activated by doing the following changes:
+- the test test_shells.test_rcfile now adds an extension to the rcfile created
+
+- the function rez.util.create_executable_script has been changed to work on linux and windows
+
+- the binding rez.bind.hello_world.py has been changed to work on linux and windows
+
+- the decorator rez.tests.utils.shell_dependent, has been edited to stop skipping everything once a shell has been excluded
+	(replaced self.skipTest by continue)
 
 ## 2.40.3 (2019-08-15)
 [Source](https://github.com/nerdvegas/rez/tree/2.40.3) | [Diff](https://github.com/nerdvegas/rez/compare/2.40.2...2.40.3)
